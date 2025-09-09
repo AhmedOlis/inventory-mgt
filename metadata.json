@@ -1,0 +1,7 @@
+{
+  "name": "InventoryPro",
+  "description": "An inventory management application to track products, scan barcodes, import/export data, and manage stock levels.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
