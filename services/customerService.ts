@@ -1,49 +1,46 @@
-
 import { Customer } from '../types';
 import { generateId } from '../utils/idGenerator';
 
-const CUSTOMERS_STORAGE_KEY = 'inventoryProCustomers';
+const CUSTOMERS_KEY = 'inventory_customers';
 
-const getStoredCustomers = (): Customer[] => {
-  const stored = localStorage.getItem(CUSTOMERS_STORAGE_KEY);
-  return stored ? JSON.parse(stored) : [];
+const getCustomersFromStorage = (): Customer[] => {
+  const customersJson = localStorage.getItem(CUSTOMERS_KEY);
+  return customersJson ? JSON.parse(customersJson) : [];
 };
 
-const saveCustomers = (customers: Customer[]): void => {
-  localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(customers));
+const saveCustomersToStorage = (customers: Customer[]) => {
+  localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(customers));
 };
 
 export const customerService = {
   getCustomers: async (): Promise<Customer[]> => {
-    return getStoredCustomers();
+    return getCustomersFromStorage();
   },
 
   getCustomerById: async (id: string): Promise<Customer | undefined> => {
-    const customers = getStoredCustomers();
+    const customers = getCustomersFromStorage();
     return customers.find(c => c.id === id);
   },
 
   addCustomer: async (customerData: Omit<Customer, 'id'>): Promise<Customer> => {
-    const customers = getStoredCustomers();
+    const customers = getCustomersFromStorage();
     const newCustomer: Customer = { ...customerData, id: generateId() };
-    saveCustomers([...customers, newCustomer]);
+    saveCustomersToStorage([...customers, newCustomer]);
     return newCustomer;
   },
 
-  updateCustomer: async (id: string, updates: Partial<Omit<Customer, 'id'>>): Promise<Customer | undefined> => {
-    let customers = getStoredCustomers();
-    const customerIndex = customers.findIndex(c => c.id === id);
-    if (customerIndex === -1) {
-      return undefined;
-    }
-    customers[customerIndex] = { ...customers[customerIndex], ...updates };
-    saveCustomers(customers);
-    return customers[customerIndex];
+  updateCustomer: async (id: string, updates: Partial<Omit<Customer, 'id'>>): Promise<Customer> => {
+    const customers = getCustomersFromStorage();
+    const index = customers.findIndex(c => c.id === id);
+    if (index === -1) throw new Error("Customer not found");
+    customers[index] = { ...customers[index], ...updates };
+    saveCustomersToStorage(customers);
+    return customers[index];
   },
 
   deleteCustomer: async (id: string): Promise<void> => {
-    let customers = getStoredCustomers();
+    let customers = getCustomersFromStorage();
     customers = customers.filter(c => c.id !== id);
-    saveCustomers(customers);
+    saveCustomersToStorage(customers);
   },
 };

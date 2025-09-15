@@ -1,69 +1,80 @@
-
+// Simple client-side data store using localStorage
 import { Product } from '../types';
 import { generateId } from '../utils/idGenerator';
 
-const PRODUCTS_STORAGE_KEY = 'inventoryProProducts';
+const PRODUCTS_KEY = 'inventory_products';
 
-const getStoredProducts = (): Product[] => {
-  const stored = localStorage.getItem(PRODUCTS_STORAGE_KEY);
-  return stored ? JSON.parse(stored) : [];
+const getProductsFromStorage = (): Product[] => {
+  try {
+    const productsJson = localStorage.getItem(PRODUCTS_KEY);
+    return productsJson ? JSON.parse(productsJson) : [];
+  } catch (e) {
+    console.error("Failed to parse products from localStorage", e);
+    return [];
+  }
 };
 
-const saveProducts = (products: Product[]): void => {
-  localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
+const saveProductsToStorage = (products: Product[]) => {
+  localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
 };
+
 
 export const productService = {
   getProducts: async (): Promise<Product[]> => {
-    return getStoredProducts();
+    return getProductsFromStorage();
   },
 
   getProductById: async (id: string): Promise<Product | undefined> => {
-    const products = getStoredProducts();
+    const products = getProductsFromStorage();
     return products.find(p => p.id === id);
   },
 
   getProductByBarcode: async (barcode: string): Promise<Product | undefined> => {
-    const products = getStoredProducts();
+    const products = getProductsFromStorage();
     return products.find(p => p.barcode === barcode);
   },
 
   addProduct: async (productData: Omit<Product, 'id'>): Promise<Product> => {
-    const products = getStoredProducts();
-    // Basic SKU uniqueness check
+    const products = getProductsFromStorage();
     if (products.some(p => p.sku === productData.sku)) {
-      throw new Error(`Product with SKU ${productData.sku} already exists.`);
+        throw new Error(`A product with SKU "${productData.sku}" already exists.`);
     }
     const newProduct: Product = { ...productData, id: generateId() };
-    saveProducts([...products, newProduct]);
+    saveProductsToStorage([...products, newProduct]);
     return newProduct;
   },
 
-  updateProduct: async (id: string, updates: Partial<Omit<Product, 'id'>>): Promise<Product | undefined> => {
-    let products = getStoredProducts();
-    const productIndex = products.findIndex(p => p.id === id);
-    if (productIndex === -1) {
-      return undefined;
-    }
+  updateProduct: async (id: string, updates: Partial<Omit<Product, 'id'>>): Promise<Product> => {
+    const products = getProductsFromStorage();
+    const index = products.findIndex(p => p.id === id);
+    if (index === -1) throw new Error("Product not found");
+    
     // Check for SKU conflict if SKU is being updated
-    if (updates.sku && updates.sku !== products[productIndex].sku) {
-        if (products.some(p => p.sku === updates.sku && p.id !== id)) {
-            throw new Error(`Another product with SKU ${updates.sku} already exists.`);
-        }
+    if (updates.sku && products.some(p => p.sku === updates.sku && p.id !== id)) {
+        throw new Error(`A product with SKU "${updates.sku}" already exists.`);
     }
-    products[productIndex] = { ...products[productIndex], ...updates };
-    saveProducts(products);
-    return products[productIndex];
+
+    products[index] = { ...products[index], ...updates };
+    saveProductsToStorage(products);
+    return products[index];
   },
 
   deleteProduct: async (id: string): Promise<void> => {
-    let products = getStoredProducts();
+    let products = getProductsFromStorage();
     products = products.filter(p => p.id !== id);
-    saveProducts(products);
+    saveProductsToStorage(products);
+  },
+
+  updateStock: async (productId: string, quantityChange: number): Promise<void> => {
+    const products = getProductsFromStorage();
+    const index = products.findIndex(p => p.id === productId);
+    if (index > -1) {
+      products[index].quantity += quantityChange;
+      saveProductsToStorage(products);
+    }
   },
 
   generateSku: (): string => {
-    // Simple SKU generator, can be improved
     return `SKU-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
   }
 };

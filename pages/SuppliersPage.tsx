@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Supplier } from '../types';
 import { supplierService } from '../services/supplierService';
@@ -26,7 +25,8 @@ export const SuppliersPage: React.FC = () => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | Omit<Supplier, 'id'> | null>(defaultSupplierState);
-  
+  const [modalError, setModalError] = useState<string | null>(null);
+
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
 
   const fetchSuppliers = useCallback(async () => {
@@ -35,8 +35,8 @@ export const SuppliersPage: React.FC = () => {
       const data = await supplierService.getSuppliers();
       setSuppliers(data);
       setError(null);
-    } catch (err) {
-      setError('Failed to fetch suppliers.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch suppliers.');
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -49,11 +49,13 @@ export const SuppliersPage: React.FC = () => {
 
   const handleAddNew = () => {
     setEditingSupplier(defaultSupplierState);
+    setModalError(null);
     setIsModalOpen(true);
   };
 
   const handleEdit = (supplier: Supplier) => {
     setEditingSupplier(supplier);
+    setModalError(null);
     setIsModalOpen(true);
   };
 
@@ -63,23 +65,37 @@ export const SuppliersPage: React.FC = () => {
 
   const confirmDelete = async () => {
     if (supplierToDelete) {
-      await supplierService.deleteSupplier(supplierToDelete.id);
-      setSupplierToDelete(null);
-      fetchSuppliers();
+      try {
+        await supplierService.deleteSupplier(supplierToDelete.id);
+        setSupplierToDelete(null);
+        fetchSuppliers();
+      } catch(err: any) {
+        setError(err.message || `Failed to delete ${supplierToDelete.name}.`);
+        setSupplierToDelete(null);
+      }
     }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingSupplier || !editingSupplier.name) return; // Basic validation
+    if (!editingSupplier || !editingSupplier.name.trim()) {
+        setModalError("Supplier name cannot be empty.");
+        return;
+    };
+    
+    setModalError(null);
 
-    if ('id' in editingSupplier) {
-      await supplierService.updateSupplier(editingSupplier.id, editingSupplier);
-    } else {
-      await supplierService.addSupplier(editingSupplier);
+    try {
+      if ('id' in editingSupplier) {
+        await supplierService.updateSupplier(editingSupplier.id, editingSupplier);
+      } else {
+        await supplierService.addSupplier(editingSupplier);
+      }
+      setIsModalOpen(false);
+      fetchSuppliers();
+    } catch(err: any) {
+        setModalError(err.message || 'An unknown error occurred.');
     }
-    setIsModalOpen(false);
-    fetchSuppliers();
   };
   
   const filteredSuppliers = useMemo(() => {
@@ -95,6 +111,8 @@ export const SuppliersPage: React.FC = () => {
         <Button variant="primary" leftIcon={ICONS.add} onClick={handleAddNew}>Add New Supplier</Button>
       </div>
 
+      {error && <div className="text-red-500 text-center p-4 bg-red-100 border border-red-500 rounded">{error}</div>}
+
       <div className="p-4 bg-white rounded-lg shadow">
         <Input 
           placeholder="Search by name..." 
@@ -105,7 +123,6 @@ export const SuppliersPage: React.FC = () => {
       </div>
       
       {isLoading && suppliers.length === 0 ? <div className="flex justify-center items-center h-64"><Spinner size="lg" /></div> :
-       error ? <div className="text-red-500 text-center p-4 bg-red-100 border border-red-500 rounded">{error}</div> :
        filteredSuppliers.length === 0 ? (
         <div className="text-center py-10 bg-white rounded-lg shadow">
           <p className="text-xl text-gray-600">No suppliers found.</p>
@@ -140,8 +157,9 @@ export const SuppliersPage: React.FC = () => {
         </div>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={'id' in editingSupplier! ? 'Edit Supplier' : 'Add Supplier'}>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingSupplier && 'id' in editingSupplier ? 'Edit Supplier' : 'Add Supplier'}>
         <form onSubmit={handleSave} className="space-y-4">
+          {modalError && <div className="mb-4 text-red-600 bg-red-100 p-3 rounded-md text-sm">{modalError}</div>}
           <Input label="Supplier Name" value={editingSupplier?.name || ''} onChange={e => setEditingSupplier({...editingSupplier!, name: e.target.value})} required />
           <Input label="Contact Person" value={editingSupplier?.contactPerson || ''} onChange={e => setEditingSupplier({...editingSupplier!, contactPerson: e.target.value})} />
           <Input label="Email" type="email" value={editingSupplier?.email || ''} onChange={e => setEditingSupplier({...editingSupplier!, email: e.target.value})} />

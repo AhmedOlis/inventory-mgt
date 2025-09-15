@@ -35,8 +35,8 @@ export const ProductPage: React.FC = () => {
         setError(`Product with ID ${id} not found.`);
         setPageTitle('Error');
       }
-    } catch (err) {
-      setError('Failed to fetch product details.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch product details.');
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -57,11 +57,13 @@ export const ProductPage: React.FC = () => {
     setError(null);
     try {
       if (productId) { // Editing existing product
-        await productService.updateProduct(productId, productData);
+        const { id, ...updateData } = productData;
+        await productService.updateProduct(productId, updateData);
       } else { // Adding new product
-        await productService.addProduct(productData);
+        const { id, ...newProductData } = productData;
+        await productService.addProduct(newProductData);
       }
-      navigate('/dashboard');
+      navigate('/sales');
     } catch (err: any) {
       setError(err.message || 'Failed to save product. Please check SKU uniqueness.');
       console.error(err);
@@ -86,10 +88,9 @@ export const ProductPage: React.FC = () => {
       <ProductForm
         initialProduct={initialProduct}
         onSubmit={handleSubmit}
-        onCancel={() => navigate('/dashboard')}
+        onCancel={() => navigate('/sales')}
         isLoading={isLoading && !productId} // Show loading on form for new product submission
         barcodeFromScanner={barcodeFromScanner}
       />
     </div>
   );
-};

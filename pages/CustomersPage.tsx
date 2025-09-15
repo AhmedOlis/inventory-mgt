@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Customer } from '../types';
 import { customerService } from '../services/customerService';
@@ -25,6 +24,7 @@ export const CustomersPage: React.FC = () => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | Omit<Customer, 'id'> | null>(defaultCustomerState);
+  const [modalError, setModalError] = useState<string | null>(null);
   
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
 
@@ -34,8 +34,8 @@ export const CustomersPage: React.FC = () => {
       const data = await customerService.getCustomers();
       setCustomers(data);
       setError(null);
-    } catch (err) {
-      setError('Failed to fetch customers.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch customers.');
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -48,11 +48,13 @@ export const CustomersPage: React.FC = () => {
 
   const handleAddNew = () => {
     setEditingCustomer(defaultCustomerState);
+    setModalError(null);
     setIsModalOpen(true);
   };
 
   const handleEdit = (customer: Customer) => {
     setEditingCustomer(customer);
+    setModalError(null);
     setIsModalOpen(true);
   };
 
@@ -62,23 +64,37 @@ export const CustomersPage: React.FC = () => {
 
   const confirmDelete = async () => {
     if (customerToDelete) {
-      await customerService.deleteCustomer(customerToDelete.id);
-      setCustomerToDelete(null);
-      fetchCustomers();
+      try {
+        await customerService.deleteCustomer(customerToDelete.id);
+        setCustomerToDelete(null);
+        fetchCustomers();
+      } catch(err: any) {
+        setError(err.message || `Failed to delete ${customerToDelete.name}.`);
+        setCustomerToDelete(null);
+      }
     }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingCustomer || !editingCustomer.name) return; // Basic validation
+    if (!editingCustomer || !editingCustomer.name.trim()) {
+        setModalError("Customer name cannot be empty.");
+        return;
+    };
+    
+    setModalError(null);
 
-    if ('id' in editingCustomer) {
-      await customerService.updateCustomer(editingCustomer.id, editingCustomer);
-    } else {
-      await customerService.addCustomer(editingCustomer);
+    try {
+      if ('id' in editingCustomer) {
+        await customerService.updateCustomer(editingCustomer.id, editingCustomer);
+      } else {
+        await customerService.addCustomer(editingCustomer);
+      }
+      setIsModalOpen(false);
+      fetchCustomers();
+    } catch (err: any) {
+      setModalError(err.message || 'An unknown error occurred.');
     }
-    setIsModalOpen(false);
-    fetchCustomers();
   };
   
   const filteredCustomers = useMemo(() => {
@@ -93,6 +109,8 @@ export const CustomersPage: React.FC = () => {
         <h1 className="text-3xl font-bold text-gray-800">Customers</h1>
         <Button variant="primary" leftIcon={ICONS.add} onClick={handleAddNew}>Add New Customer</Button>
       </div>
+      
+      {error && <div className="text-red-500 text-center p-4 bg-red-100 border border-red-500 rounded">{error}</div>}
 
       <div className="p-4 bg-white rounded-lg shadow">
         <Input 
@@ -104,7 +122,6 @@ export const CustomersPage: React.FC = () => {
       </div>
       
       {isLoading && customers.length === 0 ? <div className="flex justify-center items-center h-64"><Spinner size="lg" /></div> :
-       error ? <div className="text-red-500 text-center p-4 bg-red-100 border border-red-500 rounded">{error}</div> :
        filteredCustomers.length === 0 ? (
         <div className="text-center py-10 bg-white rounded-lg shadow">
           <p className="text-xl text-gray-600">No customers found.</p>
@@ -139,8 +156,9 @@ export const CustomersPage: React.FC = () => {
         </div>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={'id' in editingCustomer! ? 'Edit Customer' : 'Add Customer'}>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingCustomer && 'id' in editingCustomer ? 'Edit Customer' : 'Add Customer'}>
         <form onSubmit={handleSave} className="space-y-4">
+          {modalError && <div className="mb-4 text-red-600 bg-red-100 p-3 rounded-md text-sm">{modalError}</div>}
           <Input label="Name" value={editingCustomer?.name || ''} onChange={e => setEditingCustomer({...editingCustomer!, name: e.target.value})} required />
           <Input label="Email" type="email" value={editingCustomer?.email || ''} onChange={e => setEditingCustomer({...editingCustomer!, email: e.target.value})} />
           <Input label="Phone" value={editingCustomer?.phone || ''} onChange={e => setEditingCustomer({...editingCustomer!, phone: e.target.value})} />

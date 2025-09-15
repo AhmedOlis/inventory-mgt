@@ -1,3 +1,4 @@
+// FIX: Removed self-import of `Product` which was causing a name conflict with the local interface declaration.
 
 export interface Product {
   id: string;
@@ -35,7 +36,47 @@ export interface Customer {
     state: string;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+}
 
 export interface BarcodeDetectionResult {
   rawValue: string;
+}
+
+// New types for Sales and Purchases
+export interface OrderItem {
+  productId: string;
+  name: string;
+  quantity: number;
+  priceUSD: number;
+}
+
+export interface SalesOrder {
+  id: string;
+  customerId: string;
+  customerName: string;
+  items: OrderItem[];
+  orderDate: string;
+  totalAmountUSD: number;
+  exchangeRate: number;
+  paymentStatus: 'Unpaid' | 'Paid' | 'Partial';
+}
+
+export interface PurchaseOrder {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  items: OrderItem[];
+  orderDate: string;
+  status: 'Pending' | 'Partial' | 'Complete';
+  shippingStatus: 'Pending' | 'On the Way' | 'Received';
+  totalAmountUSD: number;
+  exchangeRate: number;
+  paymentStatus: 'Unpaid' | 'Paid' | 'Partial';
+}
+
+export interface Settings {
+  exchangeRateUSD_ETB: number;
 }

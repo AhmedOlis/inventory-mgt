@@ -1,12 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
-import { Product } from '../types';
+import { Product, Category } from '../types';
 import { Input } from './common/Input';
 import { Textarea } from './common/Textarea';
 import { Button } from './common/Button';
 import { Select } from './common/Select';
-import { CATEGORIES, ICONS } from '../constants';
+import { ICONS } from '../constants';
 import { productService } from '../services/productService';
+import { categoryService } from '../services/categoryService';
 import { Spinner } from './Spinner';
 
 interface ProductFormProps {
@@ -33,7 +33,12 @@ const defaultProductState: Omit<Product, 'id'> = {
 
 export const ProductForm: React.FC<ProductFormProps> = ({ initialProduct, onSubmit, onCancel, isLoading, barcodeFromScanner }) => {
   const [product, setProduct] = useState<Omit<Product, 'id'>>(defaultProductState);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [errors, setErrors] = useState<Partial<Record<keyof Product, string>>>({});
+
+  useEffect(() => {
+    categoryService.getCategories().then(setCategories);
+  }, []);
 
   useEffect(() => {
     if (initialProduct) {
@@ -85,7 +90,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialProduct, onSubm
     }
   };
 
-  const categoryOptions = CATEGORIES.map(cat => ({ value: cat, label: cat }));
+  const categoryOptions = categories.map(cat => ({ value: cat.name, label: cat.name }));
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-lg shadow-md">

@@ -1,49 +1,47 @@
-
 import { Supplier } from '../types';
 import { generateId } from '../utils/idGenerator';
 
-const SUPPLIERS_STORAGE_KEY = 'inventoryProSuppliers';
+const SUPPLIERS_KEY = 'inventory_suppliers';
 
-const getStoredSuppliers = (): Supplier[] => {
-  const stored = localStorage.getItem(SUPPLIERS_STORAGE_KEY);
-  return stored ? JSON.parse(stored) : [];
+const getSuppliersFromStorage = (): Supplier[] => {
+  const suppliersJson = localStorage.getItem(SUPPLIERS_KEY);
+  return suppliersJson ? JSON.parse(suppliersJson) : [];
 };
 
-const saveSuppliers = (suppliers: Supplier[]): void => {
-  localStorage.setItem(SUPPLIERS_STORAGE_KEY, JSON.stringify(suppliers));
+const saveSuppliersToStorage = (suppliers: Supplier[]) => {
+  localStorage.setItem(SUPPLIERS_KEY, JSON.stringify(suppliers));
 };
+
 
 export const supplierService = {
   getSuppliers: async (): Promise<Supplier[]> => {
-    return getStoredSuppliers();
+    return getSuppliersFromStorage();
   },
 
   getSupplierById: async (id: string): Promise<Supplier | undefined> => {
-    const suppliers = getStoredSuppliers();
-    return suppliers.find(p => p.id === id);
+    const suppliers = getSuppliersFromStorage();
+    return suppliers.find(s => s.id === id);
   },
 
   addSupplier: async (supplierData: Omit<Supplier, 'id'>): Promise<Supplier> => {
-    const suppliers = getStoredSuppliers();
+    const suppliers = getSuppliersFromStorage();
     const newSupplier: Supplier = { ...supplierData, id: generateId() };
-    saveSuppliers([...suppliers, newSupplier]);
+    saveSuppliersToStorage([...suppliers, newSupplier]);
     return newSupplier;
   },
 
-  updateSupplier: async (id: string, updates: Partial<Omit<Supplier, 'id'>>): Promise<Supplier | undefined> => {
-    let suppliers = getStoredSuppliers();
-    const supplierIndex = suppliers.findIndex(p => p.id === id);
-    if (supplierIndex === -1) {
-      return undefined;
-    }
-    suppliers[supplierIndex] = { ...suppliers[supplierIndex], ...updates };
-    saveSuppliers(suppliers);
-    return suppliers[supplierIndex];
+  updateSupplier: async (id: string, updates: Partial<Omit<Supplier, 'id'>>): Promise<Supplier> => {
+    const suppliers = getSuppliersFromStorage();
+    const index = suppliers.findIndex(s => s.id === id);
+    if (index === -1) throw new Error("Supplier not found");
+    suppliers[index] = { ...suppliers[index], ...updates };
+    saveSuppliersToStorage(suppliers);
+    return suppliers[index];
   },
 
   deleteSupplier: async (id: string): Promise<void> => {
-    let suppliers = getStoredSuppliers();
-    suppliers = suppliers.filter(p => p.id !== id);
-    saveSuppliers(suppliers);
+    let suppliers = getSuppliersFromStorage();
+    suppliers = suppliers.filter(s => s.id !== id);
+    saveSuppliersToStorage(suppliers);
   },
 };

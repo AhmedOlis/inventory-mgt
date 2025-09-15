@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Navbar } from './Navbar';
+import { Sidebar } from './Sidebar';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -8,14 +7,16 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {children}
-      </main>
-      <footer className="bg-gray-800 text-white text-center p-4 text-sm">
-        © {new Date().getFullYear()} Inventory Management Pro. All rights reserved.
-      </footer>
+    <div className="flex h-screen bg-gray-100 font-sans">
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 sm:p-6 lg:p-8">
+          {children}
+        </main>
+        <footer className="bg-white text-gray-600 text-center p-3 text-sm border-t">
+          © {new Date().getFullYear()} InventoryPro. All rights reserved.
+        </footer>
+      </div>
     </div>
   );
 };
