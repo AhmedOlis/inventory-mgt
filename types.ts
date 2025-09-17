@@ -80,3 +80,9 @@ export interface PurchaseOrder {
 export interface Settings {
   exchangeRateUSD_ETB: number;
 }
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+}

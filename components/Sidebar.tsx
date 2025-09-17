@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { NavLink } from 'react-router-dom';
 import { APP_NAME, ICONS } from '../constants';
+import { AuthContext } from '../contexts/AuthContext';
 
 const SidebarCategory: React.FC<{ title: string }> = ({ title }) => (
   <h3 className="px-4 pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
@@ -9,6 +10,8 @@ const SidebarCategory: React.FC<{ title: string }> = ({ title }) => (
 );
 
 export const Sidebar: React.FC = () => {
+  const { user, logout } = useContext(AuthContext);
+
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${
       isActive 
@@ -16,12 +19,19 @@ export const Sidebar: React.FC = () => {
         : 'text-gray-300 hover:bg-blue-700 hover:text-white'
     }`;
 
+  const handleLogout = () => {
+    if(logout) {
+      logout();
+    }
+  };
+
   return (
     <aside className="w-64 flex-shrink-0 bg-blue-800 text-white flex flex-col p-4 overflow-y-auto">
       <div className="text-center py-4 border-b border-blue-700">
         <NavLink to="/dashboard" className="text-white text-2xl font-bold tracking-tight">
           {APP_NAME}
         </NavLink>
+        {user && <p className="text-sm text-blue-200 mt-1">Welcome, {user.name}</p>}
       </div>
       
       <nav className="flex-1 space-y-4 mt-6">
@@ -88,6 +98,13 @@ export const Sidebar: React.FC = () => {
           </NavLink>
         </div>
       </nav>
+
+      <div className="mt-auto">
+         <button onClick={handleLogout} className="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-red-600 hover:text-white transition-colors duration-200">
+            {ICONS.logout}
+            <span>Logout</span>
+        </button>
+      </div>
     </aside>
   );
 };

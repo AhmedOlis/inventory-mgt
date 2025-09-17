@@ -15,10 +15,12 @@
     "papaparse": "^5.5.3",
     "@zxing/library": "^0.21.3",
     "chart.js": "^4.4.3",
-    "react-chartjs-2": "^5.2.0"
+    "react-chartjs-2": "^5.2.0",
+    "@google/genai": "latest"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
