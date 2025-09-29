@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Product, Category } from '../types';
 import { Input } from './common/Input';
@@ -8,7 +9,7 @@ import { ICONS } from '../constants';
 import { productService } from '../services/productService';
 import { categoryService } from '../services/categoryService';
 import { Spinner } from './Spinner';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 interface ProductFormProps {
   initialProduct?: Product | null;
@@ -32,6 +33,12 @@ const defaultProductState: Omit<Product, 'id'> = {
   barcode: '',
 };
 
+type AnalysisResult = {
+    status: 'SAFE' | 'SENSITIVE';
+    category?: string;
+    explanation?: string;
+};
+
 export const ProductForm: React.FC<ProductFormProps> = ({ initialProduct, onSubmit, onCancel, isLoading, barcodeFromScanner }) => {
   const [product, setProduct] = useState<Omit<Product, 'id'>>(defaultProductState);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -43,6 +50,11 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialProduct, onSubm
   const [generatedDescription, setGeneratedDescription] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+
+  // Content Analysis State
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -77,6 +89,24 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialProduct, onSubm
     if (errors[name as keyof Product]) {
       setErrors(prev => ({ ...prev, [name]: undefined }));
     }
+  };
+  
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProduct(prev => ({ ...prev, imageUrl: reader.result as string }));
+        if (errors.imageUrl) {
+            setErrors(prev => ({ ...prev, imageUrl: undefined }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setProduct(prev => ({ ...prev, imageUrl: '' }));
   };
 
   const validate = (): boolean => {
@@ -138,6 +168,48 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialProduct, onSubm
       setIsAiGeneratorOpen(false);
     }
   };
+  
+  const handleAnalyzeContent = async () => {
+    if (!product.name && !product.description) return;
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+    setAnalysisResult(null);
+
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const prompt = `You are a content safety moderator for an e-commerce platform. Analyze the following product information for sensitive content (e.g., hate speech, violence, adult content, dangerous goods, misleading medical claims).
+
+        Product Name: "${product.name}"
+        Product Description: "${product.description}"
+
+        Respond ONLY with a JSON object. If the content is safe, respond with {"status": "SAFE"}. If it's sensitive, respond with {"status": "SENSITIVE", "category": "Issue Category", "explanation": "Brief explanation and suggestion."}`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        status: { type: Type.STRING, description: 'Either "SAFE" or "SENSITIVE".' },
+                        category: { type: Type.STRING, description: 'Category of the sensitive content, if any.' },
+                        explanation: { type: Type.STRING, description: 'Explanation for why the content is sensitive, if applicable.' },
+                    },
+                    required: ['status']
+                }
+            }
+        });
+
+        const resultJson = JSON.parse(response.text);
+        setAnalysisResult(resultJson);
+    } catch (err) {
+        console.error("Content analysis failed", err);
+        setAnalysisError("Failed to analyze content. Please try again later.");
+    } finally {
+        setIsAnalyzing(false);
+    }
+  };
 
 
   const categoryOptions = categories.map(cat => ({ value: cat.name, label: cat.name }));
@@ -152,16 +224,27 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialProduct, onSubm
       <div>
         <div className="flex justify-between items-center mb-1">
           <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description</label>
-          <button
-            type="button"
-            onClick={handleToggleAiGenerator}
-            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-semibold transition-colors disabled:opacity-50"
-            aria-expanded={isAiGeneratorOpen}
-            disabled={!product.name}
-          >
-            {ICONS.ai}
-            <span>{isAiGeneratorOpen ? 'Close Assistant' : 'Generate with AI'}</span>
-          </button>
+           <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={handleAnalyzeContent}
+              className="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800 font-semibold transition-colors disabled:opacity-50"
+              disabled={(!product.name && !product.description) || isAnalyzing || isGenerating}
+            >
+              {isAnalyzing ? <Spinner size="sm" /> : ICONS.shieldCheck}
+              <span>{isAnalyzing ? 'Analyzing...' : 'Check Content'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleToggleAiGenerator}
+              className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-semibold transition-colors disabled:opacity-50"
+              aria-expanded={isAiGeneratorOpen}
+              disabled={!product.name || isAnalyzing}
+            >
+              {ICONS.ai}
+              <span>{isAiGeneratorOpen ? 'Close Assistant' : 'Generate with AI'}</span>
+            </button>
+          </div>
         </div>
         <Textarea id="description" name="description" value={product.description} onChange={handleChange} error={errors.description} placeholder="Detailed product description" containerClassName="mb-0" />
          {isAiGeneratorOpen && (
@@ -205,6 +288,35 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialProduct, onSubm
             )}
           </div>
         )}
+
+        {analysisError && (
+          <div className="mt-3 p-4 border rounded-lg flex items-start gap-3 bg-red-50 border-red-200">
+            <div className="flex-shrink-0 mt-0.5 text-red-500">{ICONS.exclamationTriangle}</div>
+            <div>
+              <h4 className="text-sm font-semibold text-red-800">Analysis Failed</h4>
+              <p className="text-sm text-gray-700 mt-1">{analysisError}</p>
+            </div>
+            <button type="button" onClick={() => setAnalysisError(null)} className="ml-auto text-gray-500 hover:text-gray-700 text-xl font-bold">&times;</button>
+          </div>
+        )}
+        {analysisResult && (
+            <div className={`mt-3 p-4 border rounded-lg flex items-start gap-3 relative ${analysisResult.status === 'SAFE' ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-300'}`}>
+                <div className={`flex-shrink-0 mt-0.5 ${analysisResult.status === 'SAFE' ? 'text-green-500' : 'text-yellow-500'}`}>
+                    {analysisResult.status === 'SAFE' ? ICONS.checkCircle : ICONS.exclamationTriangle}
+                </div>
+                <div>
+                    <h4 className={`text-sm font-semibold ${analysisResult.status === 'SAFE' ? 'text-green-800' : 'text-yellow-800'}`}>
+                        {analysisResult.status === 'SAFE' ? 'Content Looks Safe' : `Potential Issue: ${analysisResult.category || 'Sensitivity Detected'}`}
+                    </h4>
+                    <p className="text-sm text-gray-700 mt-1">
+                        {analysisResult.status === 'SAFE' ? 'Our AI analysis did not find any sensitive content.' : analysisResult.explanation}
+                    </p>
+                </div>
+                <button type="button" onClick={() => setAnalysisResult(null)} className="absolute top-2 right-2 text-gray-500 hover:text-gray-700" aria-label="Close analysis">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+        )}
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -223,13 +335,49 @@ export const ProductForm: React.FC<ProductFormProps> = ({ initialProduct, onSubm
 
        <Input name="price" label="Price" type="number" value={product.price.toString()} onChange={handleChange} error={errors.price} min="0" step="0.01" containerClassName="md:w-1/2 pr-3" required />
       
-      <Input name="imageUrl" label="Image URL" value={product.imageUrl || ''} onChange={handleChange} error={errors.imageUrl} placeholder="https://example.com/image.jpg" />
-      {/* Basic image preview if URL is valid */}
-      {product.imageUrl && (
-          <div className="mt-2">
-            <img src={product.imageUrl} alt="Product Preview" className="h-32 w-auto object-contain rounded border border-gray-200"/>
-          </div>
-        )}
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Product Image</label>
+        <div className="mt-2 flex items-center gap-5">
+            <div className="flex-shrink-0 h-24 w-24 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
+                {product.imageUrl ? (
+                    <img src={product.imageUrl} alt="Product Preview" className="h-full w-full object-cover" />
+                ) : (
+                    <div className="text-gray-400 p-4 text-center">
+                        {ICONS.placeholderImage}
+                    </div>
+                )}
+            </div>
+            <div className="flex flex-col gap-2">
+                <label
+                    htmlFor="image-upload"
+                    className="cursor-pointer bg-white py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+                >
+                    <span>Upload a file</span>
+                    <input
+                        id="image-upload"
+                        name="image-upload"
+                        type="file"
+                        accept="image/png, image/jpeg, image/webp"
+                        onChange={handleImageChange}
+                        className="sr-only"
+                    />
+                </label>
+                {product.imageUrl && (
+                     <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRemoveImage}
+                        className="text-red-600 border-red-300 hover:bg-red-50"
+                    >
+                        Remove
+                    </Button>
+                )}
+            </div>
+        </div>
+        {errors.imageUrl && <p className="mt-1 text-sm text-red-600">{errors.imageUrl}</p>}
+      </div>
+
       <div className="flex justify-end space-x-3 pt-4">
         {onCancel && <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>Cancel</Button>}
         <Button type="submit" variant="primary" disabled={isLoading} leftIcon={isLoading ? <Spinner size="sm" /> : null}>

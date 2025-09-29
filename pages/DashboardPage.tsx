@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { SalesOrder, PurchaseOrder, Product, Customer } from '../types';
 import { salesService } from '../services/salesService';
@@ -12,8 +13,9 @@ import { TopProductsChart } from '../components/dashboard/TopProductsChart';
 import { CategoryChart } from '../components/dashboard/CategoryChart';
 import { Button } from '../components/common/Button';
 import { Link } from 'react-router-dom';
+import { Input } from '../components/common/Input';
 
-type TimeRange = '7d' | '30d' | 'all';
+type Preset = '7d' | '30d' | 'month' | 'all' | 'custom';
 
 export const DashboardPage: React.FC = () => {
     const [sales, setSales] = useState<SalesOrder[]>([]);
@@ -22,7 +24,14 @@ export const DashboardPage: React.FC = () => {
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [timeRange, setTimeRange] = useState<TimeRange>('30d');
+
+    const [activePreset, setActivePreset] = useState<Preset>('30d');
+    const [startDate, setStartDate] = useState<Date | null>(() => {
+        const date = new Date();
+        date.setDate(date.getDate() - 30);
+        return date;
+    });
+    const [endDate, setEndDate] = useState<Date | null>(new Date());
 
     useEffect(() => {
         const fetchAllData = async () => {
@@ -48,20 +57,43 @@ export const DashboardPage: React.FC = () => {
         fetchAllData();
     }, []);
 
+    const setDateRangePreset = (preset: '7d' | '30d' | 'month' | 'all') => {
+        setActivePreset(preset);
+        const end = new Date();
+        let start: Date | null = new Date();
+
+        if (preset === 'all') {
+            start = null;
+        } else if (preset === 'month') {
+            start = new Date(end.getFullYear(), end.getMonth(), 1);
+        } else if (preset === '7d') {
+            start.setDate(end.getDate() - 7);
+        } else if (preset === '30d') {
+            start.setDate(end.getDate() - 30);
+        }
+        setStartDate(start);
+        setEndDate(end);
+    };
+
     const { filteredSales, filteredPurchases } = useMemo(() => {
-        const now = new Date();
-        const getStartDate = (range: TimeRange) => {
-            if (range === 'all') return new Date(0);
-            const days = range === '7d' ? 7 : 30;
-            return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-        };
-        const startDate = getStartDate(timeRange);
+        const startFilterDate = startDate ? new Date(startDate) : null;
+        if (startFilterDate) startFilterDate.setHours(0, 0, 0, 0);
+
+        const endFilterDate = endDate ? new Date(endDate) : null;
+        if (endFilterDate) endFilterDate.setHours(23, 59, 59, 999);
+        
+        const filterData = (data: (SalesOrder | PurchaseOrder)[]) => data.filter(item => {
+            const itemDate = new Date(item.orderDate);
+            const startMatch = !startFilterDate || itemDate >= startFilterDate;
+            const endMatch = !endFilterDate || itemDate <= endFilterDate;
+            return startMatch && endMatch;
+        });
 
         return {
-            filteredSales: sales.filter(s => new Date(s.orderDate) >= startDate),
-            filteredPurchases: purchases.filter(p => new Date(p.orderDate) >= startDate),
+            filteredSales: filterData(sales) as SalesOrder[],
+            filteredPurchases: filterData(purchases) as PurchaseOrder[],
         };
-    }, [sales, purchases, timeRange]);
+    }, [sales, purchases, startDate, endDate]);
 
     const stats = useMemo(() => {
         const totalSales = filteredSales.reduce((acc, order) => acc + order.totalAmountUSD, 0);
@@ -86,6 +118,18 @@ export const DashboardPage: React.FC = () => {
             .sort((a, b) => a.quantity - b.quantity);
     }, [products]);
 
+    const handleDateChange = (setter: React.Dispatch<React.SetStateAction<Date | null>>) => (e: React.ChangeEvent<HTMLInputElement>) => {
+        setActivePreset('custom');
+        setter(e.target.value ? new Date(e.target.value) : null);
+    };
+
+    const formatDateForInput = (date: Date | null): string => {
+        if (!date) return '';
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
 
     if (isLoading) {
         return <div className="flex justify-center items-center h-[calc(100vh-200px)]"><Spinner size="lg" /></div>;
@@ -99,17 +143,38 @@ export const DashboardPage: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-                <div className="flex items-center gap-2 bg-white p-1 rounded-lg shadow-sm">
-                    {(['7d', '30d', 'all'] as const).map(range => (
-                        <Button
-                            key={range}
-                            variant={timeRange === range ? 'primary' : 'secondary'}
-                            size="sm"
-                            onClick={() => setTimeRange(range)}
-                        >
-                            {range === '7d' ? '7 Days' : range === '30d' ? '30 Days' : 'All Time'}
-                        </Button>
-                    ))}
+                 <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 bg-white p-2 rounded-lg shadow-sm">
+                    <div className="flex items-center gap-1">
+                        {(['7d', '30d', 'month', 'all'] as const).map(p => (
+                            <Button
+                                key={p}
+                                variant={activePreset === p ? 'primary' : 'secondary'}
+                                size="sm"
+                                onClick={() => setDateRangePreset(p)}
+                            >
+                                {p === '7d' ? '7 Days' : p === '30d' ? '30 Days' : p === 'month' ? 'This Month' : 'All Time'}
+                            </Button>
+                        ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Input
+                            type="date"
+                            aria-label="Start Date"
+                            value={formatDateForInput(startDate)}
+                            onChange={handleDateChange(setStartDate)}
+                            containerClassName="mb-0"
+                            className="py-1.5"
+                        />
+                        <span className="text-gray-500 font-semibold">to</span>
+                         <Input
+                            type="date"
+                            aria-label="End Date"
+                            value={formatDateForInput(endDate)}
+                            onChange={handleDateChange(setEndDate)}
+                            containerClassName="mb-0"
+                            className="py-1.5"
+                        />
+                    </div>
                 </div>
             </div>
 

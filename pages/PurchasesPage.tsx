@@ -15,6 +15,9 @@ export const PurchasesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [orderToDelete, setOrderToDelete] = useState<PurchaseOrder | null>(null);
 
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<'All' | 'Paid' | 'Unpaid' | 'Partial'>('All');
+  const [shippingStatusFilter, setShippingStatusFilter] = useState<'All' | 'Pending' | 'On the Way' | 'Received'>('All');
+
   const navigate = useNavigate();
 
   const fetchOrders = useCallback(async () => {
@@ -56,9 +59,14 @@ export const PurchasesPage: React.FC = () => {
 
   const filteredOrders = useMemo(() => {
     return orders
-      .filter(o => o.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) || o.id.toLowerCase().includes(searchTerm.toLowerCase()))
+      .filter(o => {
+          const searchTermMatch = o.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) || o.id.toLowerCase().includes(searchTerm.toLowerCase());
+          const paymentStatusMatch = paymentStatusFilter === 'All' || o.paymentStatus === paymentStatusFilter;
+          const shippingStatusMatch = shippingStatusFilter === 'All' || o.shippingStatus === shippingStatusFilter;
+          return searchTermMatch && paymentStatusMatch && shippingStatusMatch;
+      })
       .sort((a,b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
-  }, [orders, searchTerm]);
+  }, [orders, searchTerm, paymentStatusFilter, shippingStatusFilter]);
 
   return (
     <div className="space-y-6">
@@ -69,13 +77,49 @@ export const PurchasesPage: React.FC = () => {
         </Link>
       </div>
 
-       <div className="p-4 bg-white rounded-lg shadow">
+       <div className="p-4 bg-white rounded-lg shadow space-y-4">
         <Input 
           placeholder="Search by Supplier or Order ID..." 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           containerClassName="mb-0"
         />
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+            {/* Payment Status Filter */}
+            <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium text-gray-600">Payment:</span>
+                {(['All', 'Paid', 'Unpaid', 'Partial'] as const).map(status => (
+                    <button
+                        key={status}
+                        onClick={() => setPaymentStatusFilter(status)}
+                        className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+                            paymentStatusFilter === status
+                                ? 'bg-indigo-700 text-white'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                    >
+                        {status}
+                    </button>
+                ))}
+            </div>
+            {/* Shipping Status Filter */}
+            <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium text-gray-600">Shipping:</span>
+                {(['All', 'Pending', 'On the Way', 'Received'] as const).map(status => (
+                    <button
+                        key={status}
+                        onClick={() => setShippingStatusFilter(status)}
+                        className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+                            shippingStatusFilter === status
+                                ? 'bg-green-700 text-white'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                    >
+                        {status}
+                    </button>
+                ))}
+            </div>
+        </div>
       </div>
 
       {isLoading ? <div className="flex justify-center items-center h-64"><Spinner size="lg" /></div> :

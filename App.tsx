@@ -5,7 +5,7 @@ import { AuthProvider, AuthContext } from './contexts/AuthContext';
 import { Layout } from './components/Layout';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProductPage } from './pages/ProductPage';
-import { ImportExportPage } from './pages/ImportExportPage';
+import { SpreadsheetPage } from './pages/SpreadsheetPage';
 import { ScanBarcodePage } from './pages/ScanBarcodePage';
 import { SuppliersPage } from './pages/SuppliersPage';
 import { CustomersPage } from './pages/CustomersPage';
@@ -17,7 +17,6 @@ import { SettingsPage } from './pages/SettingsPage';
 import { SalesOrderPage } from './pages/SalesOrderPage';
 import { PurchaseOrderPage } from './pages/PurchaseOrderPage';
 import { LoginPage } from './pages/LoginPage';
-import { RegisterPage } from './pages/RegisterPage';
 import { Spinner } from './components/Spinner';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -37,7 +36,7 @@ const AppRoutes: React.FC = () => {
   return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/register" element={<LoginPage />} />
         <Route 
           path="/*"
           element={
@@ -52,7 +51,7 @@ const AppRoutes: React.FC = () => {
                   <Route path="/customers" element={<CustomersPage />} />
                   <Route path="/categories" element={<CategoriesPage />} />
                   <Route path="/scan" element={<ScanBarcodePage />} />
-                  <Route path="/import-export" element={<ImportExportPage />} />
+                  <Route path="/spreadsheet" element={<SpreadsheetPage />} />
                   <Route path="/sales" element={<SalesPage />} />
                   <Route path="/sales/new" element={<SalesOrderPage />} />
                   <Route path="/sales/:orderId/edit" element={<SalesOrderPage />} />

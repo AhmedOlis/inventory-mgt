@@ -15,6 +15,9 @@ export const SalesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [orderToDelete, setOrderToDelete] = useState<SalesOrder | null>(null);
 
+  const [activeCurrency, setActiveCurrency] = useState<'USD' | 'ETB'>('USD');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<'All' | 'Paid' | 'Unpaid' | 'Partial'>('All');
+
   const navigate = useNavigate();
 
   const fetchOrders = useCallback(async () => {
@@ -56,9 +59,13 @@ export const SalesPage: React.FC = () => {
 
   const filteredOrders = useMemo(() => {
     return orders
-      .filter(o => o.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || o.id.toLowerCase().includes(searchTerm.toLowerCase()))
+      .filter(o => {
+          const searchTermMatch = o.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || o.id.toLowerCase().includes(searchTerm.toLowerCase());
+          const paymentStatusMatch = paymentStatusFilter === 'All' || o.paymentStatus === paymentStatusFilter;
+          return searchTermMatch && paymentStatusMatch;
+      })
       .sort((a,b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
-  }, [orders, searchTerm]);
+  }, [orders, searchTerm, paymentStatusFilter]);
 
   return (
     <div className="space-y-6">
@@ -69,13 +76,51 @@ export const SalesPage: React.FC = () => {
         </Link>
       </div>
 
-       <div className="p-4 bg-white rounded-lg shadow">
+       <div className="p-4 bg-white rounded-lg shadow space-y-4">
         <Input 
           placeholder="Search by Customer or Order ID..." 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           containerClassName="mb-0"
         />
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            {/* Payment Status Filter */}
+            <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-600">Status:</span>
+                {(['All', 'Paid', 'Unpaid', 'Partial'] as const).map(status => (
+                    <button
+                        key={status}
+                        onClick={() => setPaymentStatusFilter(status)}
+                        className={`px-3 py-1 text-sm font-semibold rounded-full transition-colors ${
+                            paymentStatusFilter === status
+                                ? 'bg-indigo-700 text-white'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                    >
+                        {status}
+                    </button>
+                ))}
+            </div>
+            {/* Currency Toggle */}
+            <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
+                <Button
+                    size="sm"
+                    variant={activeCurrency === 'USD' ? 'primary' : 'secondary'}
+                    onClick={() => setActiveCurrency('USD')}
+                    className="!rounded-md"
+                >
+                    USD
+                </Button>
+                <Button
+                    size="sm"
+                    variant={activeCurrency === 'ETB' ? 'primary' : 'secondary'}
+                    onClick={() => setActiveCurrency('ETB')}
+                    className="!rounded-md"
+                >
+                    ETB
+                </Button>
+            </div>
+        </div>
       </div>
 
       {isLoading ? <div className="flex justify-center items-center h-64"><Spinner size="lg" /></div> :
@@ -92,8 +137,7 @@ export const SalesPage: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total (USD)</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total (ETB)</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total ({activeCurrency})</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Status</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
@@ -104,8 +148,12 @@ export const SalesPage: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500">{order.id.substring(0, 8)}...</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.customerName}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{new Date(order.orderDate).toLocaleDateString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">${order.totalAmountUSD.toFixed(2)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{(order.totalAmountUSD * order.exchangeRate).toFixed(2)} ETB</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                    {activeCurrency === 'USD' 
+                        ? `$${order.totalAmountUSD.toFixed(2)}`
+                        : `${(order.totalAmountUSD * order.exchangeRate).toFixed(2)} ETB`
+                    }
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-center">{order.paymentStatus}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                     <Button variant="outline" size="sm" onClick={() => navigate(`/sales/${order.id}/edit`)} leftIcon={ICONS.edit}>Edit</Button>
